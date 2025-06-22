@@ -1,24 +1,38 @@
-# syntax=docker/dockerfile:1
-FROM golang:1.21-alpine
+# Dockerfile
+FROM golang:1.24.3-alpine AS builder
 
-# Install necessary tools
-RUN apk add --no-cache git
+
+# Install git and ca-certificates (needed for downloading modules)
+RUN apk add --no-cache git ca-certificates
 
 # Set working directory
 WORKDIR /app
 
-# Copy go mod and sum files
+# Copy go mod files
 COPY go.mod go.sum ./
+
+# Download dependencies
 RUN go mod download
 
-# Copy the rest of the app
+# Copy source code
 COPY . .
 
-# Build the Go app
-RUN go build -o search-service ./cmd/server
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o search-service ./cmd/server
 
-# Expose the service port
-EXPOSE 8081
+# Final stage
+FROM alpine:latest
 
-# Run the binary
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
+
+WORKDIR /root/
+
+# Copy the binary from builder stage
+COPY --from=builder /app/search-service .
+
+# Expose port
+EXPOSE 8080
+
+# Command to run
 CMD ["./search-service"]
