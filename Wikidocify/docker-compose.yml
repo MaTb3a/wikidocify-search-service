@@ -1,0 +1,189 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:14
+    container_name: wikidocify-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-doc_db_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-SecurePass889}
+      POSTGRES_DB: ${DB_NAME:-documents_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - wikidocify-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-doc_db_admin} -d ${DB_NAME:-documents_db}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: wikidocify-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - wikidocify-network
+    healthcheck:
+      test: echo ruok | nc localhost 2181 || exit -1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kafka Message Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: wikidocify-kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+    ports:
+      - "9092:9092"
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    networks:
+      - wikidocify-network
+    healthcheck:
+      test: kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: wikidocify-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - wikidocify-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # File Upload Service
+  file-upload-service:
+    build:
+      context: ./file-upload-service
+      dockerfile: Dockerfile
+    container_name: wikidocify-file-upload
+    environment:
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER:-doc_db_admin}
+      - DB_PASSWORD=${DB_PASSWORD:-SecurePass889}
+      - DB_NAME=${DB_NAME:-documents_db}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_SSLMODE=${DB_SSLMODE:-disable}
+      - SERVER_PORT=${UPLOAD_SERVICE_PORT:-8081}
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_TOPIC=document-events
+      - KAFKA_GROUP_ID=file-upload-service
+    ports:
+      - "${UPLOAD_SERVICE_PORT:-8081}:${UPLOAD_SERVICE_PORT:-8081}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - wikidocify-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${UPLOAD_SERVICE_PORT:-8081}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Elasticsearch Service
+  elasticsearch-service:
+    build:
+      context: ./elasticsearch-service
+      dockerfile: Dockerfile
+    container_name: wikidocify-search-service
+    environment:
+      - PORT=${SEARCH_SERVICE_PORT:-8080}
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_INDEX=wikidocify_documents
+      - KAFKA_BROKER=kafka:9092
+      - KAFKA_TOPIC=document-events
+      - KAFKA_GROUP_ID=elasticsearch-service
+      - FILE_UPLOAD_SERVICE_URL=http://file-upload-service:${UPLOAD_SERVICE_PORT:-8081}
+      - GIN_MODE=release
+    ports:
+      - "${SEARCH_SERVICE_PORT:-8080}:${SEARCH_SERVICE_PORT:-8080}"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - wikidocify-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${SEARCH_SERVICE_PORT:-8080}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kibana (Optional - for Elasticsearch management)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: wikidocify-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - xpack.security.enabled=false
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - wikidocify-network
+    restart: unless-stopped
+
+  # Kafka UI (Optional - for Kafka management)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: wikidocify-kafka-ui
+    ports:
+      - "8090:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - wikidocify-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+networks:
+  wikidocify-network:
+    driver: bridge
