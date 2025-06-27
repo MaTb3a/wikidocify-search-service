@@ -31,7 +31,7 @@ func NewDocServiceClient(baseURL, apiKey string, timeout time.Duration) *DocServ
 
 // GetAllDocuments fetches all documents from the document service.
 func (c *DocServiceClient) GetAllDocuments() ([]*models.Document, error) {
-	url := fmt.Sprintf("%s/api/v1/documents", c.baseURL)
+	url := fmt.Sprintf("%s/documents", c.baseURL)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (c *DocServiceClient) GetAllDocuments() ([]*models.Document, error) {
 
 // GetDocumentsPaginated fetches a page of documents for batch sync.
 func (c *DocServiceClient) GetDocumentsPaginated(page, limit int) ([]*models.Document, error) {
-	url := fmt.Sprintf("%s/api/v1/documents?page=%d&limit=%d", c.baseURL, page, limit)
+	url := fmt.Sprintf("%s/documents?page=%d&limit=%d", c.baseURL, page, limit)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (c *DocServiceClient) GetDocumentsPaginated(page, limit int) ([]*models.Doc
 
 // GetDocument fetches a single document by ID.
 func (c *DocServiceClient) GetDocument(id uint32) (*models.Document, error) {
-	url := fmt.Sprintf("%s/api/v1/documents/%d", c.baseURL, id)
+	url := fmt.Sprintf("%s/documents/%d", c.baseURL, id)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
