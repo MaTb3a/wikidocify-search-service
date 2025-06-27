@@ -62,20 +62,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # Kafka Init (Topic Creation) - Use the same image as kafka!
-  kafka-init:
-    image: confluentinc/cp-kafka:7.5.0
-    depends_on:
-      kafka:
-        condition: service_healthy
-    entrypoint: ["/bin/bash", "-c"]
-    command:
-      - |
-        sleep 20
-        kafka-topics --create --if-not-exists --topic document-events --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
-    networks:
-      - wikidocify-network
-
   # Elasticsearch
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
@@ -117,11 +103,9 @@ services:
     ports:
       - "${UPLOAD_SERVICE_PORT:-8081}:${UPLOAD_SERVICE_PORT:-8081}"
     depends_on:
-      kafka:
-        condition: service_healthy
-      kafka-init:
-        condition: service_completed_successfully
       postgres:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     networks:
       - wikidocify-network
@@ -202,6 +186,16 @@ services:
     networks:
       - wikidocify-network
     restart: unless-stopped
+
+  kafka-init:
+    image: bitnami/kafka:latest
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        sleep 20
+        kafka-topics.sh --create --if-not-exists --topic document-events --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
 
 volumes:
   postgres_data:

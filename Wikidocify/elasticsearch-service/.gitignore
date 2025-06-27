@@ -7,4 +7,5 @@ coverage.out
 .idea/
 .vscode/
 .DS_Store
+node_modules/
 

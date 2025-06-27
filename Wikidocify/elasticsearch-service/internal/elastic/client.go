@@ -160,6 +160,7 @@ func (c *Client) Search(req *models.SearchRequest) ([]models.SearchDocument, int
                     map[string]interface{}{
                         "multi_match": map[string]interface{}{
                             "query":  req.Query,
+                            "fuzziness": "AUTO",
                             "fields": queryFields,
                         },
                     },
@@ -186,6 +187,7 @@ func (c *Client) Search(req *models.SearchRequest) ([]models.SearchDocument, int
     if err != nil {
         return nil, 0, err
     }
+
     start := time.Now()
     res, err := c.es.Search(
         c.es.Search.WithContext(context.Background()),
@@ -199,6 +201,7 @@ func (c *Client) Search(req *models.SearchRequest) ([]models.SearchDocument, int
     if res.IsError() {
         return nil, 0, fmt.Errorf("search failed: %s", res.Status())
     }
+
     var result map[string]interface{}
     if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
         return nil, 0, err

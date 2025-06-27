@@ -17,6 +17,7 @@ import (
 	"wikidocify/elasticsearch-service/internal/routes"
 	"wikidocify/elasticsearch-service/internal/services"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -83,8 +84,26 @@ func main() {
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
-	
+
 	router := gin.New()
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{
+			"http://localhost:3000",
+			"http://localhost:3001",
+			"http://localhost:8080",
+			"http://localhost:8081",
+			"http://127.0.0.1:3000",
+			"http://127.0.0.1:3001",
+			"http://127.0.0.1:8080",
+			"http://127.0.0.1:8081",
+		},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
+		AllowCredentials: true,
+		MaxAge:           12 * 60 * 60, // 12 hours
+	}))
+
 	routes.SetupRoutes(router, searchHandler)
 
 	// Create HTTP server
@@ -102,7 +121,7 @@ func main() {
 		log.Printf(" Elasticsearch: %s", cfg.Elasticsearch.URL)
 		log.Printf(" Document Service: %s", cfg.DocService.BaseURL)
 		log.Printf(" Sync enabled: %v", cfg.Sync.EnableSync)
-		
+
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Failed to start server:", err)
 		}
@@ -112,7 +131,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	
+
 	log.Println(" Shutting down server...")
 
 	// Give outstanding requests a deadline for completion
