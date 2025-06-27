@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
+	"wikidocify/file-upload-service/internal/kafka"
 	"wikidocify/file-upload-service/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -62,6 +64,14 @@ func (dc *DocumentController) Create(c *gin.Context) {
 	}
 
 	log.Printf("[DATABASE] Document created successfully with ID: %d", document.ID)
+
+	// Publish Kafka event for document creation
+	if err := kafka.PublishDocEvent("created", strconv.FormatUint(uint64(document.ID), 10), document.Title, string(document.Content)); err != nil {
+		log.Printf("[KAFKA] Failed to publish created event for document ID %d: %v", document.ID, err)
+	} else {
+		log.Printf("[KAFKA] Successfully published created event for document ID %d", document.ID)
+	}
+
 	log.Printf("[API] POST /documents - Returning created document (ID: %d)", document.ID)
 	c.JSON(http.StatusCreated, document)
 }
@@ -155,6 +165,14 @@ func (dc *DocumentController) Update(c *gin.Context) {
 	}
 
 	log.Printf("[DATABASE] Document with ID %s updated successfully", id)
+
+	// Publish Kafka event for document update
+	if err := kafka.PublishDocEvent("updated", strconv.FormatUint(uint64(document.ID), 10), document.Title, string(document.Content)); err != nil {
+		log.Printf("[KAFKA] Failed to publish updated event for document ID %s: %v", id, err)
+	} else {
+		log.Printf("[KAFKA] Successfully published updated event for document ID %s", id)
+	}
+
 	log.Printf("[API] PUT /documents/%s - Returning updated document", id)
 	c.JSON(http.StatusOK, document)
 }
@@ -163,7 +181,7 @@ func (dc *DocumentController) Delete(c *gin.Context) {
 	id := c.Param("id")
 	log.Printf("[API] DELETE /documents/%s - Deleting document from IP: %s", id, c.ClientIP())
 
-	_, err := dc.documentModel.FindByID(id)
+	document, err := dc.documentModel.FindByID(id)
 	if err != nil {
 		log.Printf("[DATABASE] Document with ID %s not found for deletion: %v", id, err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Document not found"})
@@ -179,6 +197,14 @@ func (dc *DocumentController) Delete(c *gin.Context) {
 	}
 
 	log.Printf("[DATABASE] Document with ID %s deleted successfully", id)
+
+	// Publish Kafka event for document deletion
+	if err := kafka.PublishDocEvent("deleted", id, document.Title, string(document.Content)); err != nil {
+		log.Printf("[KAFKA] Failed to publish deleted event for document ID %s: %v", id, err)
+	} else {
+		log.Printf("[KAFKA] Successfully published deleted event for document ID %s", id)
+	}
+
 	log.Printf("[API] DELETE /documents/%s - Document deleted successfully", id)
 	c.JSON(http.StatusOK, gin.H{"message": "Document deleted"})
 }
