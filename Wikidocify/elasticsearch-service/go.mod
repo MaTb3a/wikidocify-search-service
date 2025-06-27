@@ -1,4 +1,4 @@
-module wikidocify-search-service
+module wikidocify/elasticsearch-service
 
 go 1.24.3
 

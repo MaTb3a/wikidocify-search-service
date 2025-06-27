@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"wikidocify-search-service/internal/config"
-	"wikidocify-search-service/internal/elastic"
-	"wikidocify-search-service/internal/handlers"
-	"wikidocify-search-service/internal/routes"
-	"wikidocify-search-service/internal/services"
+	"wikidocify/elasticsearch-service/internal/config"
+	"wikidocify/elasticsearch-service/internal/elastic"
+	"wikidocify/elasticsearch-service/internal/handlers"
+	"wikidocify/elasticsearch-service/internal/routes"
+	"wikidocify/elasticsearch-service/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -33,8 +33,6 @@ func main() {
 	// Initialize Elasticsearch client
 	esClient, err := elastic.NewClient(
 		cfg.Elasticsearch.URL,
-		cfg.Elasticsearch.Username,
-		cfg.Elasticsearch.Password,
 		cfg.Elasticsearch.Index,
 	)
 	if err != nil {

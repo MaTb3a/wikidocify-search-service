@@ -8,10 +8,11 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
-	"github.com/atheeralattar/pbl-week2/internal/models"
+	"wikidocify/file-upload-service/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -45,7 +46,6 @@ func (dc *DocumentController) Create(c *gin.Context) {
 		return
 	}
 
-	// Convert string content to []byte
 	document := models.Document{
 		Title:   docRequest.Title,
 		Content: []byte(docRequest.Content),
@@ -55,8 +55,6 @@ func (dc *DocumentController) Create(c *gin.Context) {
 	log.Printf("[API] POST /documents - Received document: title='%s', author='%s', content_size=%d bytes",
 		document.Title, document.Author, len(document.Content))
 
-	// Save the document to the database
-	log.Println("[DATABASE] Attempting to create document in database...")
 	if err := dc.documentModel.Create(&document); err != nil {
 		log.Printf("[DATABASE] Failed to create document: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -65,25 +63,42 @@ func (dc *DocumentController) Create(c *gin.Context) {
 
 	log.Printf("[DATABASE] Document created successfully with ID: %d", document.ID)
 	log.Printf("[API] POST /documents - Returning created document (ID: %d)", document.ID)
-
-	// Respond with the newly created document
 	c.JSON(http.StatusCreated, document)
 }
 
 func (dc *DocumentController) GetAll(c *gin.Context) {
 	log.Printf("[API] GET /documents - Fetching all documents from IP: %s", c.ClientIP())
 
-	log.Println("[DATABASE] Querying all documents from database...")
-	documents, err := dc.documentModel.FindAll()
+	// Parse pagination params
+	page := 1
+	limit := 20
+	if p := c.Query("page"); p != "" {
+		fmt.Sscanf(p, "%d", &page)
+	}
+	if l := c.Query("limit"); l != "" {
+		fmt.Sscanf(l, "%d", &limit)
+	}
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
+
+	log.Printf("[DATABASE] Querying documents: page=%d, limit=%d", page, limit)
+	documents, total, err := dc.documentModel.FindAllPaginated(page, limit)
 	if err != nil {
 		log.Printf("[DATABASE] Failed to fetch documents: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("[DATABASE] Successfully retrieved %d documents", len(documents))
-	log.Printf("[API] GET /documents - Returning %d documents", len(documents))
-	c.JSON(http.StatusOK, documents)
+	c.JSON(http.StatusOK, gin.H{
+		"documents": documents,
+		"page":      page,
+		"limit":     limit,
+		"total":     total,
+	})
 }
 
 func (dc *DocumentController) GetByID(c *gin.Context) {
@@ -119,7 +134,6 @@ func (dc *DocumentController) Update(c *gin.Context) {
 	log.Printf("[DATABASE] Found document to update: ID=%d, current title='%s', content_size=%d bytes",
 		document.ID, document.Title, len(document.Content))
 
-	// Bind the incoming data
 	var docRequest DocumentRequest
 	if err := c.ShouldBindJSON(&docRequest); err != nil {
 		log.Printf("[API] PUT /documents/%s - Invalid JSON payload: %v", id, err)
@@ -127,7 +141,6 @@ func (dc *DocumentController) Update(c *gin.Context) {
 		return
 	}
 
-	// Update document fields
 	document.Title = docRequest.Title
 	document.Content = []byte(docRequest.Content)
 	document.Author = docRequest.Author
@@ -135,8 +148,6 @@ func (dc *DocumentController) Update(c *gin.Context) {
 	log.Printf("[API] PUT /documents/%s - New data: title='%s', author='%s', content_size=%d bytes",
 		id, document.Title, document.Author, len(document.Content))
 
-	// Update the document in the database
-	log.Printf("[DATABASE] Updating document with ID: %s in database...", id)
 	if err := dc.documentModel.Update(&document); err != nil {
 		log.Printf("[DATABASE] Failed to update document with ID %s: %v", id, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -152,8 +163,6 @@ func (dc *DocumentController) Delete(c *gin.Context) {
 	id := c.Param("id")
 	log.Printf("[API] DELETE /documents/%s - Deleting document from IP: %s", id, c.ClientIP())
 
-	// Check if document exists
-	log.Printf("[DATABASE] Checking if document with ID %s exists...", id)
 	_, err := dc.documentModel.FindByID(id)
 	if err != nil {
 		log.Printf("[DATABASE] Document with ID %s not found for deletion: %v", id, err)
@@ -163,7 +172,6 @@ func (dc *DocumentController) Delete(c *gin.Context) {
 
 	log.Printf("[DATABASE] Document with ID %s found, proceeding with deletion...", id)
 
-	// Delete the document
 	if err := dc.documentModel.Delete(id); err != nil {
 		log.Printf("[DATABASE] Failed to delete document with ID %s: %v", id, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

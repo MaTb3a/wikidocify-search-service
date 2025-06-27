@@ -6,9 +6,10 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
-	"wikidocify-search-service/internal/elastic"
+	"wikidocify/elasticsearch-service/internal/services"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -20,7 +21,7 @@ type DocEvent struct {
 	Content string `json:"content"`
 }
 
-func StartConsumer() {
+func StartConsumer(searchService *services.SearchService) {
 	broker := os.Getenv("KAFKA_BROKER") // e.g., "kafka:9092"
 	topic := os.Getenv("KAFKA_TOPIC")   // e.g., "document-events"
 	if broker == "" || topic == "" {
@@ -50,13 +51,21 @@ func StartConsumer() {
 			continue
 		}
 		log.Printf("Received Kafka event: %+v", ev)
+
+		// Parse ID as uint32
+		id, err := strconv.ParseUint(ev.ID, 10, 32)
+		if err != nil {
+			log.Printf("Invalid document ID in event: %v", err)
+			continue
+		}
+
 		switch ev.Event {
 		case "created", "updated":
-			if err := elastic.IndexDocument(ev.ID, ev.Title, ev.Content); err != nil {
-				log.Printf("Failed to index document: %v", err)
+			if err := searchService.SyncDocument(uint32(id)); err != nil {
+				log.Printf("Failed to sync document: %v", err)
 			}
 		case "deleted":
-			if err := elastic.DeleteDocument(ev.ID); err != nil {
+			if err := searchService.DeleteDocument(uint32(id)); err != nil {
 				log.Printf("Failed to delete document: %v", err)
 			}
 		default:

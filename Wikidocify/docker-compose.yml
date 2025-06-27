@@ -1,10 +1,8 @@
-# docker-compose.yml
-version: '3.8'
 
 services:
   # Database
   postgres:
-    image: postgres:14
+    image: postgres:17
     container_name: wikidocify-postgres
     environment:
       POSTGRES_USER: ${DB_USER:-doc_db_admin}
@@ -17,7 +15,11 @@ services:
     networks:
       - wikidocify-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-doc_db_admin} -d ${DB_NAME:-documents_db}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-doc_db_admin} -d ${DB_NAME:-documents_db}",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -46,8 +48,8 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
-      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
     ports:
       - "9092:9092"
     depends_on:
@@ -77,7 +79,8 @@ services:
     networks:
       - wikidocify-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      test:
+        ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -95,10 +98,9 @@ services:
       - DB_NAME=${DB_NAME:-documents_db}
       - DB_PORT=${DB_PORT:-5432}
       - DB_SSLMODE=${DB_SSLMODE:-disable}
-      - SERVER_PORT=${UPLOAD_SERVICE_PORT:-8081}
+      - UPLOAD_SERVICE_PORT=${UPLOAD_SERVICE_PORT:-8081}
       - KAFKA_BROKER=kafka:9092
       - KAFKA_TOPIC=document-events
-      - KAFKA_GROUP_ID=file-upload-service
     ports:
       - "${UPLOAD_SERVICE_PORT:-8081}:${UPLOAD_SERVICE_PORT:-8081}"
     depends_on:
@@ -110,19 +112,23 @@ services:
       - wikidocify-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${UPLOAD_SERVICE_PORT:-8081}/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://localhost:${UPLOAD_SERVICE_PORT:-8081}/health || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # Elasticsearch Service
+  # Elasticsearch Service (Search Service)
   elasticsearch-service:
     build:
       context: ./elasticsearch-service
       dockerfile: Dockerfile
     container_name: wikidocify-search-service
     environment:
-      - PORT=${SEARCH_SERVICE_PORT:-8080}
+      - SEARCH_SERVICE_PORT=${SEARCH_SERVICE_PORT:-8080}
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - ELASTICSEARCH_INDEX=wikidocify_documents
       - KAFKA_BROKER=kafka:9092
@@ -141,7 +147,11 @@ services:
       - wikidocify-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:${SEARCH_SERVICE_PORT:-8080}/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://localhost:${SEARCH_SERVICE_PORT:-8080}/health || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

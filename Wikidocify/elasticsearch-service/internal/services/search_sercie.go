@@ -6,17 +6,17 @@ import (
 	"log"
 	"time"
 
-	"wikidocify-search-service/internal/elastic"
-	"wikidocify-search-service/internal/models"
+	"wikidocify/elasticsearch-service/internal/elastic"
+	"wikidocify/elasticsearch-service/internal/models"
 )
 
 type SearchService struct {
-	esClient       *elastic.Client
-	docService     *DocServiceClient
-	syncInterval   time.Duration
-	batchSize      int
-	enableSync     bool
-	lastSyncTime   time.Time
+	esClient     *elastic.Client
+	docService   *DocServiceClient
+	syncInterval time.Duration
+	batchSize    int
+	enableSync   bool
+	lastSyncTime time.Time
 }
 
 func NewSearchService(esClient *elastic.Client, docService *DocServiceClient, syncInterval time.Duration, batchSize int, enableSync bool) *SearchService {
@@ -29,10 +29,12 @@ func NewSearchService(esClient *elastic.Client, docService *DocServiceClient, sy
 	}
 }
 
-func (s *SearchService) Search(req *models.SearchRequest) (*models.SearchResponse, error) {
+// Search performs a search using the ES client and returns docs and total count
+func (s *SearchService) Search(req *models.SearchRequest) ([]models.SearchDocument, int64, error) {
 	return s.esClient.Search(req)
 }
 
+// SyncDocument fetches a document from doc service and indexes it in ES
 func (s *SearchService) SyncDocument(docID uint32) error {
 	// Get document from doc service
 	doc, err := s.docService.GetDocument(docID)
@@ -52,6 +54,7 @@ func (s *SearchService) SyncDocument(docID uint32) error {
 	return nil
 }
 
+// DeleteDocument removes a document from ES by ID
 func (s *SearchService) DeleteDocument(docID uint32) error {
 	if err := s.esClient.DeleteDocument(docID); err != nil {
 		return fmt.Errorf("failed to delete document from Elasticsearch: %w", err)
@@ -61,6 +64,7 @@ func (s *SearchService) DeleteDocument(docID uint32) error {
 	return nil
 }
 
+// FullSync fetches all documents from doc service and bulk indexes them in ES
 func (s *SearchService) FullSync() error {
 	log.Println("Starting full sync...")
 	
@@ -84,9 +88,11 @@ func (s *SearchService) FullSync() error {
 			searchDocs[i] = doc.ToSearchDocument()
 		}
 
-		// Bulk index
-		if err := s.esClient.BulkIndex(searchDocs); err != nil {
-			return fmt.Errorf("failed to bulk index documents: %w", err)
+		// If you have BulkIndex implemented, use it. Otherwise, index one by one:
+		for _, sd := range searchDocs {
+			if err := s.esClient.IndexDocument(sd); err != nil {
+				return fmt.Errorf("failed to index document: %w", err)
+			}
 		}
 
 		totalSynced += len(docs)
@@ -105,6 +111,7 @@ func (s *SearchService) FullSync() error {
 	return nil
 }
 
+// StartPeriodicSync runs FullSync on a schedule if enabled
 func (s *SearchService) StartPeriodicSync() {
 	if !s.enableSync {
 		log.Println("Periodic sync is disabled")
@@ -126,6 +133,7 @@ func (s *SearchService) StartPeriodicSync() {
 	}()
 }
 
+// GetSyncStatus returns sync status info
 func (s *SearchService) GetSyncStatus() map[string]interface{} {
 	return map[string]interface{}{
 		"sync_enabled":    s.enableSync,
@@ -135,6 +143,7 @@ func (s *SearchService) GetSyncStatus() map[string]interface{} {
 	}
 }
 
+// HealthCheck checks the health of ES and doc service
 func (s *SearchService) HealthCheck() map[string]bool {
 	status := map[string]bool{
 		"elasticsearch": true,

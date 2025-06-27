@@ -56,7 +56,7 @@ func Load() (*Config, error) {
 	cfg.Elasticsearch.Index = getEnv("ELASTICSEARCH_INDEX", "wikidocify_documents")
 
 	// Doc service config
-	cfg.DocService.BaseURL = getEnv("DOC_SERVICE_URL", "http://localhost:8081")
+	cfg.DocService.BaseURL = getEnv("DOC_SERVICE_URL", "http://file-upload-service:8081")
 	cfg.DocService.Timeout = getDurationEnv("DOC_SERVICE_TIMEOUT", 30*time.Second)
 	cfg.DocService.APIKey = getEnv("DOC_SERVICE_API_KEY", "")
 

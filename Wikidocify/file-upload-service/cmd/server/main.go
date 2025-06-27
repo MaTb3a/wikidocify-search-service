@@ -4,19 +4,19 @@ import (
 	"log"
 	"os"
 
-	"github.com/atheeralattar/pbl-week2/internal/config"
-	"github.com/atheeralattar/pbl-week2/internal/routes"
-	"github.com/atheeralattar/pbl-week2/internal/kafka"
+	"wikidocify/file-upload-service/internal/config"
+	"wikidocify/file-upload-service/internal/kafka"
+	"wikidocify/file-upload-service/internal/routes"
+
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	log.Println("[STARTUP] Starting document-system server...")
+	log.Println("[STARTUP] Starting file-upload-service server...")
 
 	// Load environment variables from .env file
 	log.Println("[CONFIG] Loading environment variables...")
-	err := godotenv.Load()
-	if err != nil {
+	if err := godotenv.Load(); err != nil {
 		log.Printf("[CONFIG] Warning: Error loading .env file: %v", err)
 		log.Println("[CONFIG] Continuing with system environment variables...")
 	} else {
@@ -30,16 +30,16 @@ func main() {
 	// Initialize Kafka producer
 	log.Println("[KAFKA] Initializing Kafka producer...")
 	kafka.InitKafkaWriter()
-	
+
 	// Setup routes
 	log.Println("[ROUTES] Setting up HTTP routes...")
 	router := routes.SetupRoutes()
 
 	// Get server port from environment variable
-	port := os.Getenv("SERVER_PORT")
+	port := os.Getenv("UPLOAD_SERVICE_PORT")
 	if port == "" {
-		port = "8080" // fallback to default port
-		log.Printf("[CONFIG] SERVER_PORT not set, using default port: %s", port)
+		port = "8081" // fallback to default port
+		log.Printf("[CONFIG] UPLOAD_SERVICE_PORT not set, using default port: %s", port)
 	} else {
 		log.Printf("[CONFIG] Using configured port: %s", port)
 	}

@@ -1,16 +1,16 @@
 package elastic
 
 import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "log"
-    "time"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
 
-    "github.com/elastic/go-elasticsearch/v8"
-    "github.com/elastic/go-elasticsearch/v8/esapi"
-    "wikidocify-search-service/internal/models"
+	"wikidocify/elasticsearch-service/internal/models"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 type Client struct {
@@ -67,19 +67,16 @@ func (c *Client) createIndexIfNotExists() error {
         return nil // Index exists
     }
 
-    // Minimal mapping for search service
+    // Mapping matches SearchDocument fields
     mapping := map[string]interface{}{
         "mappings": map[string]interface{}{
             "properties": map[string]interface{}{
-                "id": map[string]interface{}{"type": "keyword"},
-                "title": map[string]interface{}{
-                    "type":     "text",
-                    "analyzer": "standard",
-                },
-                "content": map[string]interface{}{
-                    "type":     "text",
-                    "analyzer": "standard",
-                },
+                "id":        map[string]interface{}{"type": "integer"},
+                "title":     map[string]interface{}{"type": "text", "analyzer": "standard"},
+                "content":   map[string]interface{}{"type": "text", "analyzer": "standard"},
+                "author":    map[string]interface{}{"type": "keyword"},
+                "created_at": map[string]interface{}{"type": "date"},
+                "updated_at": map[string]interface{}{"type": "date"},
             },
         },
     }
@@ -100,23 +97,18 @@ func (c *Client) createIndexIfNotExists() error {
     if res.IsError() {
         return fmt.Errorf("failed to create index: %s", res.Status())
     }
-    log.Printf("Created Elasticsearch index: %s", c.index)
     return nil
 }
 
-func (c *Client) IndexDocument(id, title, content string) error {
-    doc := map[string]interface{}{
-        "id":      id,
-        "title":   title,
-        "content": content,
-    }
+// IndexDocument indexes a SearchDocument in Elasticsearch
+func (c *Client) IndexDocument(doc *models.SearchDocument) error {
     docJSON, err := json.Marshal(doc)
     if err != nil {
         return err
     }
     req := esapi.IndexRequest{
         Index:      c.index,
-        DocumentID: id,
+        DocumentID: fmt.Sprint(doc.ID),
         Body:       bytes.NewReader(docJSON),
         Refresh:    "true",
     }
@@ -131,10 +123,11 @@ func (c *Client) IndexDocument(id, title, content string) error {
     return nil
 }
 
-func (c *Client) DeleteDocument(id string) error {
+// DeleteDocument deletes a document by ID from Elasticsearch
+func (c *Client) DeleteDocument(id uint32) error {
     req := esapi.DeleteRequest{
         Index:      c.index,
-        DocumentID: id,
+        DocumentID: fmt.Sprint(id),
         Refresh:    "true",
     }
     res, err := req.Do(context.Background(), c.es)
@@ -148,55 +141,111 @@ func (c *Client) DeleteDocument(id string) error {
     return nil
 }
 
-func (c *Client) Search(query string, limit, offset int) ([]map[string]interface{}, error) {
-    if limit <= 0 || limit > 100 {
-        limit = 10
+// Search performs a search query with filters and pagination
+func (c *Client) Search(req *models.SearchRequest) ([]models.SearchDocument, int64, error) {
+    queryFields := []string{}
+    switch req.Type {
+    case "title":
+        queryFields = []string{"title"}
+    case "content":
+        queryFields = []string{"content"}
+    default:
+        queryFields = []string{"title^2", "content"}
     }
-    if offset < 0 {
-        offset = 0
-    }
+
     esQuery := map[string]interface{}{
         "query": map[string]interface{}{
-            "multi_match": map[string]interface{}{
-                "query":  query,
-                "fields": []string{"title^2", "content"},
+            "bool": map[string]interface{}{
+                "must": []interface{}{
+                    map[string]interface{}{
+                        "multi_match": map[string]interface{}{
+                            "query":  req.Query,
+                            "fields": queryFields,
+                        },
+                    },
+                },
             },
         },
-        "from": offset,
-        "size": limit,
+        "from": req.Offset,
+        "size": req.Limit,
     }
+
+    // Optional author filter
+    if req.Author != "" {
+        boolQuery := esQuery["query"].(map[string]interface{})["bool"].(map[string]interface{})
+        boolQuery["filter"] = []interface{}{
+            map[string]interface{}{
+                "term": map[string]interface{}{
+                    "author": req.Author,
+                },
+            },
+        }
+    }
+
     queryJSON, err := json.Marshal(esQuery)
     if err != nil {
-        return nil, err
+        return nil, 0, err
     }
-    req := esapi.SearchRequest{
-        Index: []string{c.index},
-        Body:  bytes.NewReader(queryJSON),
-    }
-    res, err := req.Do(context.Background(), c.es)
+    start := time.Now()
+    res, err := c.es.Search(
+        c.es.Search.WithContext(context.Background()),
+        c.es.Search.WithIndex(c.index),
+        c.es.Search.WithBody(bytes.NewReader(queryJSON)),
+    )
     if err != nil {
-        return nil, err
+        return nil, 0, err
     }
     defer res.Body.Close()
     if res.IsError() {
-        return nil, fmt.Errorf("search failed: %s", res.Status())
+        return nil, 0, fmt.Errorf("search failed: %s", res.Status())
     }
     var result map[string]interface{}
     if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-        return nil, err
+        return nil, 0, err
     }
     hits, ok := result["hits"].(map[string]interface{})
     if !ok {
-        return nil, fmt.Errorf("invalid search response format")
+        return nil, 0, fmt.Errorf("invalid search response format")
     }
     hitsList, _ := hits["hits"].([]interface{})
-    docs := make([]map[string]interface{}, 0, len(hitsList))
+    docs := make([]models.SearchDocument, 0, len(hitsList))
     for _, hit := range hitsList {
         hitMap, _ := hit.(map[string]interface{})
         source, _ := hitMap["_source"].(map[string]interface{})
-        docs = append(docs, source)
+        var doc models.SearchDocument
+        // Map fields from ES source to SearchDocument
+        if id, ok := source["id"].(float64); ok {
+            doc.ID = uint32(id)
+        }
+        if title, ok := source["title"].(string); ok {
+            doc.Title = title
+        }
+        if content, ok := source["content"].(string); ok {
+            doc.Content = content
+        }
+        if author, ok := source["author"].(string); ok {
+            doc.Author = author
+        }
+        if createdAt, ok := source["created_at"].(string); ok {
+            if t, err := time.Parse(time.RFC3339, createdAt); err == nil {
+                doc.CreatedAt = t
+            }
+        }
+        if updatedAt, ok := source["updated_at"].(string); ok {
+            if t, err := time.Parse(time.RFC3339, updatedAt); err == nil {
+                doc.UpdatedAt = t
+            }
+        }
+        docs = append(docs, doc)
     }
-    return docs, nil
+    total := int64(0)
+    if v, ok := hits["total"].(map[string]interface{}); ok {
+        if val, ok := v["value"].(float64); ok {
+            total = int64(val)
+        }
+    }
+    _ = time.Since(start) // You can use this for took_ms if needed
+    return docs, total, nil
 }
 
 func (c *Client) HealthCheck() error {

@@ -7,10 +7,11 @@
 package models
 
 import (
-	"time"
-	"github.com/atheeralattar/pbl-week2/internal/kafka"
 	"fmt"
 	"log"
+	"time"
+
+	"wikidocify/file-upload-service/internal/kafka"
 
 	"gorm.io/gorm"
 )
@@ -47,7 +48,6 @@ func (m *DocumentModel) Create(doc *Document) error {
 		log.Println("[KAFKA] Failed to publish event:", err)
 	}
 	return nil
-
 }
 
 // FindAll retrieves all documents
@@ -55,6 +55,19 @@ func (m *DocumentModel) FindAll() ([]Document, error) {
 	var documents []Document
 	err := m.DB.Find(&documents).Error
 	return documents, err
+}
+
+// FindAllPaginated retrieves all documents with pagination
+func (m *DocumentModel) FindAllPaginated(page, limit int) ([]Document, int64, error) {
+	var documents []Document
+	var total int64
+
+	offset := (page - 1) * limit
+	if err := m.DB.Model(&Document{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	err := m.DB.Limit(limit).Offset(offset).Order("created_at desc").Find(&documents).Error
+	return documents, total, err
 }
 
 // FindByID retrieves a document by its ID
@@ -76,7 +89,6 @@ func (m *DocumentModel) Update(doc *Document) error {
 		log.Println("[KAFKA] Failed to publish event:", err)
 	}
 	return nil
-
 }
 
 // Delete removes a document
@@ -94,5 +106,4 @@ func (m *DocumentModel) Delete(id string) error {
 		log.Println("[KAFKA] Failed to publish event:", err)
 	}
 	return nil
-
 }

@@ -9,8 +9,8 @@ package routes
 import (
 	"log"
 
-	"github.com/atheeralattar/pbl-week2/internal/config"
-	"github.com/atheeralattar/pbl-week2/internal/handlers"
+	"wikidocify/file-upload-service/internal/config"
+	"wikidocify/file-upload-service/internal/handlers"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,6 +18,11 @@ import (
 func SetupRoutes() *gin.Engine {
 	log.Println("[ROUTES] Initializing Gin router...")
 	r := gin.Default()
+
+	// Health check endpoint
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
 
 	// Initialize controllers
 	log.Println("[ROUTES] Creating document controller...")

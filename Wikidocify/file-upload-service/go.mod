@@ -1,10 +1,11 @@
-module github.com/atheeralattar/pbl-week2
+module wikidocify/file-upload-service
 
 go 1.23.5
 
 require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/joho/godotenv v1.5.1
+	github.com/segmentio/kafka-go v0.4.48
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.26.0
 )
@@ -36,7 +37,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
-	github.com/segmentio/kafka-go v0.4.48 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	golang.org/x/arch v0.16.0 // indirect

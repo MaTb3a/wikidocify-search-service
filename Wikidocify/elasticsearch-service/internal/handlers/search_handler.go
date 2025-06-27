@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"wikidocify-search-service/internal/models"
-	"wikidocify-search-service/internal/services"
+	"wikidocify/elasticsearch-service/internal/models"
+	"wikidocify/elasticsearch-service/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -41,8 +41,16 @@ func (h *SearchHandler) Search(c *gin.Context) {
         return
     }
 
+    // Set default pagination if not provided
+    if req.Limit == 0 {
+        req.Limit = 10
+    }
+    if req.Offset < 0 {
+        req.Offset = 0
+    }
+
     // Perform search
-    result, err := h.searchService.Search(&req)
+    docs, total, err := h.searchService.Search(&req)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{
             "error":   "Search failed",
@@ -51,7 +59,13 @@ func (h *SearchHandler) Search(c *gin.Context) {
         return
     }
 
-    c.JSON(http.StatusOK, result)
+    response := models.SearchResponse{
+        Documents: docs,
+        Total:     total,
+        Query:     req.Query,
+        Took:      0, // Optionally set if you measure time
+    }
+    c.JSON(http.StatusOK, response)
 }
 
 // Health handles health check requests
