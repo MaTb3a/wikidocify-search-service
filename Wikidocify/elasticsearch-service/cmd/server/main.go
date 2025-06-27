@@ -13,6 +13,7 @@ import (
 	"wikidocify-search-service/internal/config"
 	"wikidocify-search-service/internal/elastic"
 	"wikidocify-search-service/internal/handlers"
+	consumer "wikidocify-search-service/internal/kafka"
 	"wikidocify-search-service/internal/routes"
 	"wikidocify-search-service/internal/services"
 
@@ -81,7 +82,7 @@ func main() {
 	if os.Getenv("GIN_MODE") == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
-	
+
 	router := gin.New()
 	routes.SetupRoutes(router, searchHandler)
 
@@ -100,17 +101,23 @@ func main() {
 		log.Printf(" Elasticsearch: %s", cfg.Elasticsearch.URL)
 		log.Printf(" Document Service: %s", cfg.DocService.BaseURL)
 		log.Printf(" Sync enabled: %v", cfg.Sync.EnableSync)
-		
+
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Failed to start server:", err)
 		}
 	}()
+	// kafkaConfigration
+	ctx := context.Background()
+
+	// Start Kafka consumers in background
+	go consumer.StartAll(ctx)
 
 	// Wait for interrupt signal to gracefully shutdown the server
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	
+
 	log.Println(" Shutting down server...")
 
 	// Give outstanding requests a deadline for completion

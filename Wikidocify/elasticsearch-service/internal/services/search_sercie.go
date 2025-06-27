@@ -11,12 +11,12 @@ import (
 )
 
 type SearchService struct {
-	esClient       *elastic.Client
-	docService     *DocServiceClient
-	syncInterval   time.Duration
-	batchSize      int
-	enableSync     bool
-	lastSyncTime   time.Time
+	esClient     *elastic.Client
+	docService   *DocServiceClient
+	syncInterval time.Duration
+	batchSize    int
+	enableSync   bool
+	lastSyncTime time.Time
 }
 
 func NewSearchService(esClient *elastic.Client, docService *DocServiceClient, syncInterval time.Duration, batchSize int, enableSync bool) *SearchService {
@@ -63,7 +63,7 @@ func (s *SearchService) DeleteDocument(docID uint32) error {
 
 func (s *SearchService) FullSync() error {
 	log.Println("Starting full sync...")
-	
+
 	page := 1
 	totalSynced := 0
 
@@ -112,7 +112,7 @@ func (s *SearchService) StartPeriodicSync() {
 	}
 
 	log.Printf("Starting periodic sync every %v", s.syncInterval)
-	
+
 	ticker := time.NewTicker(s.syncInterval)
 	go func() {
 		for range ticker.C {
@@ -128,10 +128,10 @@ func (s *SearchService) StartPeriodicSync() {
 
 func (s *SearchService) GetSyncStatus() map[string]interface{} {
 	return map[string]interface{}{
-		"sync_enabled":    s.enableSync,
-		"sync_interval":   s.syncInterval.String(),
-		"batch_size":      s.batchSize,
-		"last_sync_time":  s.lastSyncTime,
+		"sync_enabled":   s.enableSync,
+		"sync_interval":  s.syncInterval.String(),
+		"batch_size":     s.batchSize,
+		"last_sync_time": s.lastSyncTime,
 	}
 }
 
