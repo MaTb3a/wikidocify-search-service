@@ -3,6 +3,12 @@ FROM golang:1.23.5-alpine AS builder
 
 WORKDIR /app
 
+# Install git (needed for some Go modules)
+RUN apk add --no-cache git
+
+# Set Go proxy
+ENV GOPROXY=direct
+
 # Copy go files
 COPY go.mod go.sum ./
 RUN go mod download
@@ -23,4 +29,4 @@ COPY --from=builder /app/server .
 EXPOSE 8081
 
 # Run
-CMD ["./server"] 
+CMD ["./server"]

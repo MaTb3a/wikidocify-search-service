@@ -31,7 +31,7 @@ func main() {
 	log.Println("[KAFKA] Initializing Kafka producer...")
 	kafka.InitKafkaWriter()
 
-	// Setup routes
+	// Setup routes (CORS is handled inside SetupRoutes)
 	log.Println("[ROUTES] Setting up HTTP routes...")
 	router := routes.SetupRoutes()
 
@@ -52,3 +52,5 @@ func main() {
 		log.Fatalf("[SERVER] Failed to start server: %v", err)
 	}
 }
+
+// ENV GOPROXY=direct

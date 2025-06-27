@@ -12,12 +12,21 @@ import (
 	"wikidocify/file-upload-service/internal/config"
 	"wikidocify/file-upload-service/internal/handlers"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func SetupRoutes() *gin.Engine {
 	log.Println("[ROUTES] Initializing Gin router...")
 	r := gin.Default()
+
+	// Add CORS middleware here
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowCredentials: true,
+	}))
 
 	// Health check endpoint
 	r.GET("/health", func(c *gin.Context) {
