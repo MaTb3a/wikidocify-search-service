@@ -13,6 +13,7 @@ import (
 	"wikidocify/elasticsearch-service/internal/config"
 	"wikidocify/elasticsearch-service/internal/elastic"
 	"wikidocify/elasticsearch-service/internal/handlers"
+	"wikidocify/elasticsearch-service/internal/kafka"
 	"wikidocify/elasticsearch-service/internal/routes"
 	"wikidocify/elasticsearch-service/internal/services"
 
@@ -57,6 +58,9 @@ func main() {
 		cfg.Sync.EnableSync,
 	)
 	log.Println("Search service initialized")
+
+	// Start Kafka consumer for real-time sync
+	go kafka.StartConsumer(searchService)
 
 	// Perform initial full sync if enabled
 	if cfg.Sync.EnableSync {

@@ -101,9 +101,10 @@ func (m *DocumentModel) Delete(id string) error {
 	if err != nil {
 		return err
 	}
-	err = kafka.PublishDocEvent("deleted", fmt.Sprint(doc.ID), doc.Title, string(doc.Content))
+	// Only send ID for delete event, leave title/content empty
+	err = kafka.PublishDocEvent("deleted", fmt.Sprint(doc.ID), "", "")
 	if err != nil {
-		log.Println("[KAFKA] Failed to publish event:", err)
+		log.Println("[KAFKA] Failed to publish delete event:", err)
 	}
 	return nil
 }
