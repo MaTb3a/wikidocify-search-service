@@ -28,6 +28,8 @@ func SetupRoutes(router *gin.Engine, searchHandler *handlers.SearchHandler) {
 	// API v1 routes
 	api := router.Group("/api/v1")
 	{
+		api.POST("/sync/full", searchHandler.FullSync)
+
 		api.GET("/search", searchHandler.Search)
 	}
 }

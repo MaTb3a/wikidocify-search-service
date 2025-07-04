@@ -31,12 +31,10 @@ function DocumentList() {
 
   return (
     <div style={{ marginTop: 40 }}>
-      <h3>Uploaded Documents</h3>
+      <h3>Uploaded Documents titles</h3>
       <ul>
         {documents.map((doc) => (
-          <li key={doc.id}>
-            <strong>{doc.title}</strong> by {doc.author}
-          </li>
+          <li key={doc.id}>{doc.title}</li>
         ))}
       </ul>
     </div>

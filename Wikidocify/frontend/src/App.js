@@ -1,14 +1,13 @@
 import React from "react";
 import "./App.css";
-import FileUpload from "./FileUpload";
+import DocumentForm from "./DocumentForm";
 import DocumentList from "./DocumentList";
-
 function App() {
   return (
-    <div
-      style={{ background: "#f5f6fa", minHeight: "100vh", padding: "2rem 0" }}
-    >
-      <FileUpload />
+    <div style={{ maxWidth: 600, margin: "2rem auto", padding: 24 }}>
+      <h1>WikiDocify Document Service</h1>
+      <DocumentForm />
+      <hr style={{ margin: "2rem 0" }} />
       <DocumentList />
     </div>
   );
